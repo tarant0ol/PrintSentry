@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  postgres_db:
+    image: postgres:16-alpine # Используем стабильную 16-ю версию Postgres
+    container_name: 3d_print_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}           # Логин для подключения
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} # Пароль для подключения
+      POSTGRES_DB: ${POSTGRES_DB}   # Имя базы данных по умолчанию
+    ports:
+      - "{APP_PORT}:5432"                  # Пробрасываем стандартный порт Postgres наружу
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Папка, где БД будет надежно хранить файлы на вашем диске
+
+volumes:
+  postgres_data: # Виртуальный диск для хранения данных, чтобы они не удалялись при перезапуске
