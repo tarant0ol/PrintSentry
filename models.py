@@ -2,11 +2,12 @@ from typing import Optional
 import datetime
 import decimal
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKeyConstraint, Identity, Integer, Numeric, PrimaryKeyConstraint, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKeyConstraint, Identity, Integer, Numeric, PrimaryKeyConstraint, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 class Base(DeclarativeBase):
     pass
+
 
 class Clients(Base):
     __tablename__ = 'clients'
@@ -63,6 +64,7 @@ class DefectType(Base):
     defect_cause_links: Mapped[list['DefectCauseLinks']] = relationship('DefectCauseLinks', back_populates='defect_type')
     defect_recomendation_links: Mapped[list['DefectRecomendationLinks']] = relationship('DefectRecomendationLinks', back_populates='defect_type')
     defect_parameters: Mapped[list['DefectParameters']] = relationship('DefectParameters', back_populates='defect_type')
+    detected_defects: Mapped[list['DetectedDefects']] = relationship('DetectedDefects', back_populates='defect_type')
 
 
 class EquipmentType(Base):
@@ -175,7 +177,8 @@ class DefectRecomendationLinks(Base):
     __table_args__ = (
         ForeignKeyConstraint(['defect_recomendation_id'], ['defect_recomendations.defect_recomendation_id'], ondelete='RESTRICT', onupdate='CASCADE', name='defect_recomendation_links_defect_recomendations_fk'),
         ForeignKeyConstraint(['defect_type_id'], ['defect_type.defect_type_id'], ondelete='RESTRICT', onupdate='CASCADE', name='defect_recomendation_links_defect_type_fk'),
-        PrimaryKeyConstraint('defect_recomendation_link_id', name='defect_recomendation_links_pk')
+        PrimaryKeyConstraint('defect_recomendation_link_id', name='defect_recomendation_links_pk'),
+        UniqueConstraint('defect_type_id', 'defect_recomendation_id', name='uq_defect_recomendation_pair')
     )
 
     defect_recomendation_link_id: Mapped[int] = mapped_column(Integer, Identity(always=True, start=1, increment=1, minvalue=1, maxvalue=2147483647, cycle=False, cache=1), primary_key=True, autoincrement=True)
@@ -268,11 +271,11 @@ class Orders(Base):
 
     order_id: Mapped[int] = mapped_column(Integer, Identity(always=True, start=1, increment=1, minvalue=1, maxvalue=2147483647, cycle=False, cache=1), primary_key=True, autoincrement=True)
     client_id: Mapped[Optional[int]] = mapped_column(Integer)
-    status_id: Mapped[Optional[int]] = mapped_column(Integer)
     created_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime)
     deadline: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime)
     total_cost: Mapped[Optional[decimal.Decimal]] = mapped_column(Numeric)
     comment: Mapped[Optional[str]] = mapped_column(Text)
+    status: Mapped[Optional[str]] = mapped_column(String)
 
     client: Mapped[Optional['Clients']] = relationship('Clients', back_populates='orders')
     order_products: Mapped[list['OrderProducts']] = relationship('OrderProducts', back_populates='order')
@@ -398,7 +401,6 @@ class QualityChecks(Base):
 
     check_id: Mapped[int] = mapped_column(Integer, Identity(always=True, start=1, increment=1, minvalue=1, maxvalue=2147483647, cycle=False, cache=1), primary_key=True, autoincrement=True)
     stage_id: Mapped[Optional[int]] = mapped_column(Integer)
-    check_type_id: Mapped[Optional[int]] = mapped_column(Integer)
     employee_id: Mapped[Optional[int]] = mapped_column(Integer)
     check_date: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime)
     result_id: Mapped[Optional[int]] = mapped_column(Integer)
@@ -407,6 +409,7 @@ class QualityChecks(Base):
     employee: Mapped[Optional['Employees']] = relationship('Employees', back_populates='quality_checks')
     result: Mapped[Optional['QualityResults']] = relationship('QualityResults', back_populates='quality_checks')
     stage: Mapped[Optional['ProductionStages']] = relationship('ProductionStages', back_populates='quality_checks')
+    detected_defects: Mapped[list['DetectedDefects']] = relationship('DetectedDefects', back_populates='check')
 
 
 class StageEquipment(Base):
@@ -427,6 +430,23 @@ class StageEquipment(Base):
     stage: Mapped[Optional['ProductionStages']] = relationship('ProductionStages', back_populates='stage_equipment')
     stage_parameters: Mapped[list['StageParameters']] = relationship('StageParameters', back_populates='stage_equipment')
     stage_requirements: Mapped[list['StageRequirements']] = relationship('StageRequirements', back_populates='stage_equipment')
+
+
+class DetectedDefects(Base):
+    __tablename__ = 'detected_defects'
+    __table_args__ = (
+        ForeignKeyConstraint(['check_id'], ['quality_checks.check_id'], name='detected_defects_check_id_fkey'),
+        ForeignKeyConstraint(['defect_type_id'], ['defect_type.defect_type_id'], name='detected_defects_defect_type_id_fkey'),
+        PrimaryKeyConstraint('detected_defect_id', name='detected_defects_pkey')
+    )
+
+    detected_defect_id: Mapped[int] = mapped_column(Integer, Identity(always=True, start=1, increment=1, minvalue=1, maxvalue=2147483647, cycle=False, cache=1), primary_key=True, autoincrement=True)
+    check_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    defect_type_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+
+    check: Mapped['QualityChecks'] = relationship('QualityChecks', back_populates='detected_defects')
+    defect_type: Mapped['DefectType'] = relationship('DefectType', back_populates='detected_defects')
 
 
 class StageParameters(Base):
